@@ -5,32 +5,31 @@ const PORT = 8080;
 let date = new Date().toUTCString();
 
 const server = http.createServer((req, res) => {
-  //body is used later for POST
+  // Body takes in chunks requested by client
   let body = "";
   req.on("data", chunk => {
     body += chunk;
   });
   req.on("end", () => {
-    //GET Method
+    /*** GET Method ***/
     if (req.method === "GET") {
-      //Grabs files from public to show to client
+      // Grabs files from public to show to client
       let directory;
       let contentType;
       fs.readdir('./public/', (err, files) => {
-        if (files.includes(req.url.slice(1)) === false) {
-          console.log(req.url)
-          if (req.url === "/") {
+        if (files.includes(req.url.slice(1)) === false) { // Directory doesn't exist
+          if (req.url === "/") { // For default page
             directory = "/index.html";
             contentType = "html"
-          } else if (req.url.slice(-3) === "css") {
+          } else if (req.url.slice(-3) === "css") { // Needed to load css properly
             directory = `${req.url}`
             contentType = "css"
           } else {
             directory = '/404.html';
             contentType = 'html';
           }
-        } else {
-          if (req.url.slice(-3) === "css") {
+        } else { // Directory exists
+          if (req.url.slice(-3) === "css") { // Needed to load css properly
             directory = `${req.url}`
             contentType = "css"
           } else {
@@ -38,7 +37,7 @@ const server = http.createServer((req, res) => {
             contentType = req.url.slice(req.url.indexOf('.') + 1, req.url.length);
           }
         }
-        fs.readFile(`./public${directory}`, (err, data) => {
+        fs.readFile(`./public${directory}`, (err, data) => { // Sends requested data
           if (err) {
             return console.log(err);
           }
@@ -52,13 +51,13 @@ const server = http.createServer((req, res) => {
         });
       });
     }
-    //POST Method
+    /*** POST Method ***/
     if (req.method === "POST") {
-      //Decode from the key value pairs in Postman
+      // Decode from the key value pairs in Postman
       let decodeChunk = querystring.parse(body);
-      //Used for new element pages
+      // Used for new element pages
       addOrUpdateElem(decodeChunk, req, res)
-      //Update index.html
+      // Update index.html
       parseNewHTML(decodeChunk, req, res);
       res.writeHead(200, {
         "Content-Type": 'application/json',
@@ -67,9 +66,9 @@ const server = http.createServer((req, res) => {
       })
       res.end();
     }
-    //PUT Method
+    /*** PUT Method ***/
     if (req.method === "PUT") {
-      //Decode from the key value pairs in Postman
+      // Decode from the key value pairs in Postman
       let decodeChunk = querystring.parse(body);
       fs.readdir("./public/", (err, files) => {
         if (err) {
@@ -87,9 +86,9 @@ const server = http.createServer((req, res) => {
         }
       });
     }
-    //DELETE Method
+    /*** DELETE Method ***/
     if (req.method === "DELETE") {
-      //Decode from the key value pairs in Postman
+      // Decode from the key value pairs in Postman
       let decodeChunk = querystring.parse(body);
       fs.readdir("./public/", (err, files) => {
         if (err) {
@@ -117,11 +116,11 @@ server.listen(PORT, () => {
   console.log(`Server started on PORT: ${PORT}`);
 });
 
-/***************FUNCTIONS**************/
+/*************** FUNCTIONS **************/
 
-//Add or Update element.html
+// Add and/or Update element.html
 function addOrUpdateElem(chunk, req, res) {
-  //Used for new element pages
+  // Used for new element pages
   let htmlTemplate = `<!DOCTYPE html>
         <html lang="en">
           <head>
@@ -139,7 +138,7 @@ function addOrUpdateElem(chunk, req, res) {
             <p><a href="/">back</a></p>
           </body>
         </html>`;
-  //Create new element page
+  // Create new element page
   fs.writeFile(
     `./public/${chunk["elementName"]}.html`,
     htmlTemplate,
@@ -157,7 +156,7 @@ function addOrUpdateElem(chunk, req, res) {
   res.end();
 }
 
-//Makes a updated index.html
+// Creates and/or updates index.html
 function parseNewHTML(chunk, req, res) {
   let existingFiles = [];
   let contentLength = 0;
@@ -170,7 +169,7 @@ function parseNewHTML(chunk, req, res) {
         existingFiles.push(files[x]);
       }
     };
-    //Top part of index.html
+    // Top part of index.html
     let indexTop = `<!DOCTYPE html>
     <html lang="en">
     
@@ -185,7 +184,7 @@ function parseNewHTML(chunk, req, res) {
       <h2>These are all the known elements.</h2>
       <h3>These are ${existingFiles.length}</h3>
       <ol>`;
-    //Middle part of index.html
+    // Middle part of index.html
     for (let y = 0; y < existingFiles.length; y++) {
       let indexMid = `
         <li>
@@ -193,7 +192,7 @@ function parseNewHTML(chunk, req, res) {
         </li>`;
       indexTop += indexMid
     };
-    //Bottom part of index.html
+    // Bottom part of index.html
     let indexEnd = `
       </ol>
     </body>
