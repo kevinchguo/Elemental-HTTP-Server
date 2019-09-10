@@ -16,30 +16,54 @@ const server = http.createServer((req, res) => {
       // Grabs files from public to show to client
       let directory;
       let contentType;
-      fs.readdir('./public/', (err, files) => {
-        if (files.includes(req.url.slice(1)) === false) { // Directory doesn't exist
-          if (req.url === "/") { // For default page
+      fs.readdir("./public/", (err, files) => {
+        if (err) {
+          console.log(err);
+          res.writeHead(500, {
+            "Content-Type": `application/json, charset=utf-8`,
+            error: `resource ${req.url} does not exist`,
+            Date: date
+          });
+          res.end();
+        }
+        if (files.includes(req.url.slice(1)) === false) {
+          // Directory doesn't exist
+          if (req.url === "/") {
+            // For default page
             directory = "/index.html";
-            contentType = "html"
-          } else if (req.url.slice(-3) === "css") { // Needed to load css properly
-            directory = `${req.url}`
-            contentType = "css"
+            contentType = "html";
+          } else if (req.url.slice(-3) === "css") {
+            // Needed to load css properly
+            directory = `${req.url}`;
+            contentType = "css";
           } else {
-            directory = '/404.html';
-            contentType = 'html';
+            directory = "/404.html";
+            contentType = "html";
           }
-        } else { // Directory exists
-          if (req.url.slice(-3) === "css") { // Needed to load css properly
-            directory = `${req.url}`
-            contentType = "css"
+        } else {
+          // Directory exists
+          if (req.url.slice(-3) === "css") {
+            // Needed to load css properly
+            directory = `${req.url}`;
+            contentType = "css";
           } else {
-            directory = req.url
-            contentType = req.url.slice(req.url.indexOf('.') + 1, req.url.length);
+            directory = req.url;
+            contentType = req.url.slice(
+              req.url.indexOf(".") + 1,
+              req.url.length
+            );
           }
         }
-        fs.readFile(`./public${directory}`, (err, data) => { // Sends requested data
+        fs.readFile(`./public${directory}`, (err, data) => {
+          // Sends requested data
           if (err) {
-            return console.log(err);
+            console.log(err);
+            res.writeHead(500, {
+              "Content-Type": `application/json, charset=utf-8`,
+              error: `resource ${req.url} does not exist`,
+              Date: date
+            });
+            res.end();
           }
           res.writeHead(200, {
             "Content-Type": `text/${contentType}, charset=utf-8`,
@@ -56,15 +80,13 @@ const server = http.createServer((req, res) => {
       // Decode from the key value pairs in Postman
       let decodeChunk = querystring.parse(body);
       // Used for new element pages
-      addOrUpdateElem(decodeChunk, req, res)
-      // Update index.html
-      parseNewHTML(decodeChunk, req, res);
-      res.writeHead(200, {
-        "Content-Type": 'application/json',
-        "Success": true,
-        "Date": date
-      })
-      res.end();
+      addOrUpdateElem(
+        decodeChunk,
+        req,
+        res,
+        req.method,
+        parseNewHTML(decodeChunk, req, res)
+      );
     }
     /*** PUT Method ***/
     if (req.method === "PUT") {
@@ -72,15 +94,27 @@ const server = http.createServer((req, res) => {
       let decodeChunk = querystring.parse(body);
       fs.readdir("./public/", (err, files) => {
         if (err) {
-          console.log(err)
+          console.log(err);
+          res.writeHead(500, {
+            "Content-Type": `application/json, charset=utf-8`,
+            error: `resource ${req.url} does not exist`,
+            Date: date
+          });
+          res.end();
         }
         if (files.includes(req.url.slice(1)) === true) {
-          addOrUpdateElem(decodeChunk, req, res)
+          addOrUpdateElem(
+            decodeChunk,
+            req,
+            res,
+            req.method,
+            parseNewHTML(decodeChunk, req, res)
+          );
         } else {
           res.writeHead(500, {
             "Content-Type": `application/json, charset=utf-8`,
-            "error": `resource ${req.url} does not exist`,
-            "Date": date
+            error: `resource ${req.url} does not exist`,
+            Date: date
           });
           res.end();
         }
@@ -92,22 +126,29 @@ const server = http.createServer((req, res) => {
       let decodeChunk = querystring.parse(body);
       fs.readdir("./public/", (err, files) => {
         if (err) {
-          return console.log(err);
-        }
-        if (files.includes(req.url.slice(1)) === true) {
-          fs.unlink(`./public${req.url}`, (err) => {
-            parseNewHTML(decodeChunk, req, res);
-          });
-        } else {
+          console.log(err);
           res.writeHead(500, {
             "Content-Type": `application/json, charset=utf-8`,
-            "error": `resource ${req.url} does not exist`,
-            "Date": date
+            error: `resource ${req.url} does not exist`,
+            Date: date
           });
           res.end();
         }
+        if (files.includes(req.url.slice(1)) === true) {
+          fs.unlink(`./public${req.url}`, err => {
+            if (err) {
+              console.log(err);
+              res.writeHead(500, {
+                "Content-Type": `application/json, charset=utf-8`,
+                error: `Request not sent`,
+                Date: date
+              });
+              res.end();
+            }
+            parseNewHTML(decodeChunk, req, res);
+          });
+        }
       });
-      res.end();
     }
   });
 });
@@ -119,7 +160,7 @@ server.listen(PORT, () => {
 /*************** FUNCTIONS **************/
 
 // Add and/or Update element.html
-function addOrUpdateElem(chunk, req, res) {
+function addOrUpdateElem(chunk, req, res, method, func) {
   // Used for new element pages
   let htmlTemplate = `<!DOCTYPE html>
         <html lang="en">
@@ -139,36 +180,42 @@ function addOrUpdateElem(chunk, req, res) {
           </body>
         </html>`;
   // Create new element page
-  fs.writeFile(
-    `./public/${chunk["elementName"]}.html`,
-    htmlTemplate,
-    err => {
-      if (err) {
-        return console.log("Cannot write file " + err);
-      }
+  fs.writeFile(`./public/${chunk["elementName"]}.html`, htmlTemplate, err => {
+    if (err) {
+      return console.log("Cannot write file " + err);
     }
-  );
-  res.writeHead(200, {
-    "Content-Type": `text/html, charset=utf-8`,
-    "Content-Length": htmlTemplate.length,
-    "Date": date
   });
-  res.end();
+  if (method === "POST" || method === "PUT") {
+    func;
+  } else {
+    res.writeHead(200, {
+      "Content-Type": `text/html, charset=utf-8`,
+      "Content-Length": htmlTemplate.length,
+      Date: date
+    });
+    res.end();
+  }
 }
 
 // Creates and/or updates index.html
 function parseNewHTML(chunk, req, res) {
   let existingFiles = [];
   let contentLength = 0;
-  fs.readdir('./public/', (err, files) => {
+  fs.readdir("./public/", (err, files) => {
     if (err) {
-      return console.log("Directory is not there " + err)
+      console.log("Directory is not there " + err);
+      res.writeHead(500, {
+        "Content-Type": `application/json, charset=utf-8`,
+        error: `resource ${req.url} does not exist`,
+        Date: date
+      });
+      res.end();
     }
     for (let x = 0; x < files.length; x++) {
-      if (!['.keep', '404.html', 'css', 'index.html'].includes(files[x])) {
+      if (![".keep", "404.html", "css", "index.html"].includes(files[x])) {
         existingFiles.push(files[x]);
       }
-    };
+    }
     // Top part of index.html
     let indexTop = `<!DOCTYPE html>
     <html lang="en">
@@ -188,10 +235,10 @@ function parseNewHTML(chunk, req, res) {
     for (let y = 0; y < existingFiles.length; y++) {
       let indexMid = `
         <li>
-          <a href="/${existingFiles[y]}">${existingFiles[y].split('.')[0]}</a>
+          <a href="/${existingFiles[y]}">${existingFiles[y].split(".")[0]}</a>
         </li>`;
-      indexTop += indexMid
-    };
+      indexTop += indexMid;
+    }
     // Bottom part of index.html
     let indexEnd = `
       </ol>
@@ -199,20 +246,22 @@ function parseNewHTML(chunk, req, res) {
   </html>`;
     contentLength = indexTop.length + indexEnd.length;
     // index.html is re-written with new ref to new elements
-    fs.writeFile(
-      "./public/index.html",
-      `${indexTop}${indexEnd}`,
-      err => {
-        if (err) {
-          return console.log("Cannot write file " + err);
-        }
+    fs.writeFile("./public/index.html", `${indexTop}${indexEnd}`, err => {
+      if (err) {
+        console.log("Cannot write file " + err);
+        res.writeHead(500, {
+          "Content-Type": `application/json, charset=utf-8`,
+          error: `resource ${req.url} does not exist`,
+          Date: date
+        });
+        res.end();
       }
-    );
+      res.writeHead(200, {
+        "Content-Type": `text/html, charset=utf-8`,
+        "Content-Length": contentLength,
+        Date: date
+      });
+      res.end();
+    });
   });
-  res.writeHead(200, {
-    "Content-Type": `text/html, charset=utf-8`,
-    "Content-Length": contentLength,
-    "Date": date
-  });
-  res.end();
 }
